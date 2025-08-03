@@ -1,8 +1,8 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const cors = require('cors');
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -26,86 +26,124 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
+    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+  },
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: function (req, file, cb) {
     // Accept only image files
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'), false);
+      cb(new Error("Only image files are allowed!"), false);
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
 });
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(uploadsDir));
+app.use("/uploads", express.static(uploadsDir));
 
 // Upload endpoint
-app.post('/upload', upload.single('image'), (req, res) => {
+app.post("/upload", upload.single("image"), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return res.status(400).json({ error: "No file uploaded" });
     }
 
     const imageUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
-    
+
     res.json({
-      message: 'File uploaded successfully',
+      message: "File uploaded successfully",
       filename: req.file.filename,
       originalName: req.file.originalname,
       size: req.file.size,
-      url: imageUrl
+      url: imageUrl,
     });
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+// Upload endpoint for saving as "last-image"
+app.post("/upload-last-image", upload.single("image"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Rename the uploaded file to "last-image"
+    const ext = path.extname(req.file.originalname);
+    const newFilename = "last-image" + ext;
+    const oldPath = req.file.path;
+    const newPath = path.join(uploadsDir, newFilename);
+
+    // Remove existing "last-image" file if it exists
+    if (fs.existsSync(newPath)) {
+      fs.unlinkSync(newPath);
+    }
+
+    // Rename the uploaded file
+    fs.renameSync(oldPath, newPath);
+
+    const imageUrl = `http://localhost:${PORT}/uploads/${newFilename}`;
+
+    res.json({
+      message: "File uploaded and saved as last-image successfully",
+      filename: newFilename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      url: imageUrl,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
 // Error handling middleware for multer
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res
+        .status(400)
+        .json({ error: "File too large. Maximum size is 10MB." });
     }
   }
   res.status(400).json({ error: error.message });
 });
 
 // Get all uploaded images
-app.get('/images', (req, res) => {
+app.get("/images", (req, res) => {
   try {
     const files = fs.readdirSync(uploadsDir);
     const images = files
-      .filter(file => {
+      .filter((file) => {
         const ext = path.extname(file).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].includes(ext);
+        return [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"].includes(ext);
       })
-      .map(file => ({
+      .map((file) => ({
         filename: file,
-        url: `http://localhost:${PORT}/uploads/${file}`,
-        path: path.join(uploadsDir, file)
+        url: `ttp://localhost:${PORT}/uploads/${file}`,
+        path: path.join(uploadsDir, file),
       }));
-    
+
     res.json(images);
   } catch (error) {
-    console.error('Error reading images:', error);
-    res.status(500).json({ error: 'Failed to read images' });
+    console.error("Error reading images:", error);
+    res.status(500).json({ error: "Failed to read images" });
   }
 });
 
 // Simple HTML page to test uploads
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -202,4 +240,4 @@ app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Upload endpoint: http://localhost:${PORT}/upload`);
   console.log(`Images endpoint: http://localhost:${PORT}/images`);
-}); 
+});
